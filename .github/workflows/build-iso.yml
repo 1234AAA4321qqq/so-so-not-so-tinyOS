@@ -1,0 +1,44 @@
+name: Build ISO
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base
+      options: --privileged
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install archiso
+        run: pacman -Syyu --noconfirm archiso
+
+      - name: Build ISO
+        run: mkarchiso -v -o ./out ./archiso-profile
+
+      - name: Show output
+        run: ls -lh out/ && du -sh out/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tinyos-iso
+          path: out/*.iso
+          retention-days: 30
+
+      - name: Attach ISO to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.iso
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
