@@ -1,0 +1,216 @@
+name: Reset Structure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base
+      options: --privileged
+
+    steps:
+      - name: Install deps
+        run: pacman -Syyu --noconfirm archiso git
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Nuke old structure
+        run: |
+          rm -rf auto config archiso-profile out work
+          rm -f README.md .gitignore
+          rm -f .github/workflows/build-iso.yml
+          rm -f .github/workflows/scaffold.yml
+          rm -f .github/workflows/scaffold-arch.yml
+
+      - name: Copy official releng profile
+        run: |
+          mkdir -p archiso-profile
+          cp -r /usr/share/archiso/configs/releng/. archiso-profile/
+
+      - name: Write profiledef.sh
+        run: |
+          cat > archiso-profile/profiledef.sh << 'PROFILE_EOF'
+          #!/usr/bin/env bash
+          # shellcheck disable=SC2034
+          iso_name="soso-not-so-tinyos"
+          iso_label="SOSO_TINYOS"
+          iso_publisher="1234AAA4321qqq"
+          iso_application="so so not so tinyOS"
+          iso_version="v1.0.0"
+          install_dir="arch"
+          buildmodes=('iso')
+          bootmodes=('bios.syslinux' 'uefi.systemd-boot')
+          arch="x86_64"
+          pacman_conf="pacman.conf"
+          airootfs_image_type="squashfs"
+          airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
+          file_permissions=(
+            ["/etc/shadow"]="0:0:400"
+            ["/etc/gshadow"]="0:0:400"
+            ["/root"]="0:0:750"
+            ["/root/customize_airootfs.sh"]="0:0:755"
+          )
+          PROFILE_EOF
+
+      - name: Write packages.x86_64
+        run: |
+          cat > archiso-profile/packages.x86_64 << 'PKG_EOF'
+          base
+          linux
+          linux-firmware
+          mkinitcpio
+          mkinitcpio-archiso
+          syslinux
+          systemd-sysvcompat
+          xorg-server
+          xorg-xinit
+          xorg-xsetroot
+          xf86-input-libinput
+          xf86-video-vesa
+          xf86-video-intel
+          openbox
+          pcmanfm
+          lxterminal
+          xterm
+          ttf-dejavu
+          noto-fonts-cjk
+          networkmanager
+          wpa_supplicant
+          iwd
+          dhcpcd
+          git
+          curl
+          wget
+          nano
+          vim
+          htop
+          tree
+          unzip
+          zip
+          sudo
+          less
+          file
+          python
+          python-pip
+          go
+          ca-certificates
+          gnupg
+          PKG_EOF
+
+      - name: Write customize_airootfs.sh
+        run: |
+          cat > archiso-profile/airootfs/root/customize_airootfs.sh << 'CUSTOM_EOF'
+          #!/usr/bin/env bash
+          set -e
+
+          useradd -m -s /bin/bash -G wheel,audio,video,network,storage,optical akira 2>/dev/null || true
+          echo "akira:akira" | chpasswd
+          echo "root:root" | chpasswd
+          echo "akira ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/akira
+          chmod 0440 /etc/sudoers.d/akira
+
+          mkdir -p /etc/systemd/system/getty@tty1.service.d
+          cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << 'AUTOEOF'
+          [Service]
+          ExecStart=
+          ExecStart=-/sbin/agetty --autologin akira --noclear %I $TERM
+          Type=idle
+          AUTOEOF
+
+          cat > /home/akira/.bash_profile << 'PROFEOF'
+          if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+            exec startx
+          fi
+          PROFEOF
+          chown akira:akira /home/akira/.bash_profile
+
+          mkdir -p /home/akira/.config/openbox
+          cat > /home/akira/.config/openbox/autostart << 'OBEOF'
+          pcmanfm --desktop &
+          xsetroot -solid "#1a1a2e" &
+          OBEOF
+          chown -R akira:akira /home/akira/.config
+
+          cat > /home/akira/.xinitrc << 'XIEOF'
+          #!/bin/sh
+          exec openbox-session
+          XIEOF
+          chmod +x /home/akira/.xinitrc
+          chown akira:akira /home/akira/.xinitrc
+
+          systemctl enable NetworkManager 2>/dev/null || true
+
+          mkdir -p /usr/local/bin
+          wget -q -O /usr/local/bin/autoserver \
+            https://github.com/tinybinary-idk/autoserver/releases/download/v1.0.0/autoserver-linux-amd64 2>/dev/null || true
+          chmod +x /usr/local/bin/autoserver 2>/dev/null || true
+
+          cat > /etc/motd << 'MOTDEOF'
+
+            ╔══════════════════════════════════════════╗
+            ║     so so not so tinyOS                  ║
+            ║     Login: akira    Password: akira      ║
+            ║     Root:  root     Password: root       ║
+            ╚══════════════════════════════════════════╝
+
+          MOTDEOF
+
+          pacman -Scc --noconfirm 2>/dev/null || true
+          CUSTOM_EOF
+
+      - name: Write .gitignore
+        run: |
+          cat > .gitignore << 'GI_EOF'
+          out/
+          work/
+          *.iso
+          GI_EOF
+
+      - name: Write README.md
+        run: |
+          cat > README.md << 'README_EOF'
+          # so so not so tinyOS
+
+          A custom Arch Linux-based ISO. Not tiny. Not NOT tiny either.
+
+          ## What's inside
+          - Arch Linux base
+          - Openbox window manager
+          - PCManFM file manager
+          - LXTerminal
+          - Python, Go
+          - Preinstalled: autoserver
+
+          ## Download
+          Grab the ISO from [Releases](../../releases).
+
+          ## Flash to USB
+          sudo dd if=soso-not-so-tinyos-*.iso of=/dev/sdX bs=4M status=progress oflag=sync
+
+          ## Build
+          Push a tag like v1.0.0. The ISO builds automatically (~30-50 min).
+
+          ## License
+          MIT
+          README_EOF
+
+      - name: Fix permissions
+        run: |
+          chmod +x archiso-profile/profiledef.sh
+          chmod +x archiso-profile/airootfs/root/customize_airootfs.sh
+
+      - name: Commit and push
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: reset to Arch archiso structure" || echo "Nothing to commit"
+          git push
