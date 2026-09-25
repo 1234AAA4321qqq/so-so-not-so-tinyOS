@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+lb build
+mkdir -p output
+mv live-image-amd64.hybrid.iso output/ 2>/dev/null || true
