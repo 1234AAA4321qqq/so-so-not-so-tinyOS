@@ -1,0 +1,72 @@
+name: Scaffold Project
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create directory structure
+        run: |
+          mkdir -p auto
+          mkdir -p config/package-lists
+          mkdir -p config/hooks/normal
+          mkdir -p config/includes.chroot/etc/skel
+
+      - name: Create empty big files
+        run: |
+          touch auto/config
+          touch config/package-lists/tinyos.list.chroot
+          touch config/hooks/normal/0100-setup.hook.chroot
+          touch README.md
+
+      - name: Create small files
+        run: |
+          cat > auto/build << 'EOF'
+          #!/bin/sh
+          set -e
+          lb build
+          mkdir -p output
+          mv live-image-amd64.hybrid.iso output/ 2>/dev/null || true
+          EOF
+
+          cat > auto/clean << 'EOF'
+          #!/bin/sh
+          set -e
+          lb clean --purge
+          rm -rf output/
+          EOF
+
+          cat > config/includes.chroot/etc/skel/.xinitrc << 'EOF'
+          #!/bin/sh
+          exec openbox-session
+          EOF
+
+          cat > .gitignore << 'EOF'
+          binary/
+          cache/
+          chroot/
+          output/
+          *.iso
+          EOF
+
+      - name: Make files executable
+        run: |
+          chmod +x auto/config
+          chmod +x auto/build
+          chmod +x auto/clean
+          chmod +x config/includes.chroot/etc/skel/.xinitrc
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: scaffold project skeleton" || echo "Nothing to commit"
+          git push
