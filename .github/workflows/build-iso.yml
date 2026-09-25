@@ -46,7 +46,7 @@ jobs:
         run: sudo ./auto/config
 
       - name: Build the ISO
-        run: sudo ./auto/build
+        run: sudo -E env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root ./auto/build
 
       - name: Show output
         run: ls -lh output/ && du -sh output/*
