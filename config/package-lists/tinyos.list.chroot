@@ -1,0 +1,47 @@
+# --- Xorg + minimal desktop ---
+xorg
+xinit
+xserver-xorg
+xserver-xorg-video-all
+xserver-xorg-input-all
+openbox
+obconf
+pcmanfm
+lxterminal
+menu
+
+# --- Fonts ---
+fonts-dejavu
+fonts-noto-cjk
+fonts-noto-color-emoji
+
+# --- Networking ---
+network-manager
+wpasupplicant
+iw
+rfkill
+
+# --- Dev tools ---
+git
+curl
+wget
+vim-tiny
+nano
+htop
+tree
+unzip
+zip
+
+# --- Python + Go ---
+python3
+python3-pip
+python3-venv
+golang-go
+
+# --- Utilities ---
+sudo
+ca-certificates
+gnupg
+less
+file
+xterm
